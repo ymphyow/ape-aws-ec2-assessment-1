@@ -128,11 +128,11 @@ E: Write error - write (28: No space left on device)
 E: IO Error saving source cache
 E: The package lists or status file could not be parsed or opened.
 ```
-Find the process 
+Step 1-Find the process 
 ```bash
 ps aux | grep app.py
 ```
-Kill it 
+Step 2 - Kill it 
 ```bash
 sudo kill -9 <PID>
 ```
