@@ -86,10 +86,22 @@ cd /opt/storage-breaker
   --workers 1 \
   --no-access-log
 ```
-
+Another option to run app
+```bash
+cd /opt/storage-breaker/ape-aws-ec2-assessment-1
+/opt/storage-breaker/.venv/bin/uvicorn app:app \
+  --host 127.0.0.1 \
+  --port 3000 \
+  --workers 1 \
+  --no-access-log
+```
+ or 
+ ```bash
+  ../.venv/bin/uvicorn app:app --host 127.0.0.1 --port 3000 --workers 1 --no-access-log
+  ```
 Configure Nginx as a reverse proxy from port `80` to:
 
-```text
+```bash
 http://127.0.0.1:3000
 ```
 
@@ -106,3 +118,79 @@ curl -i http://EC2_PUBLIC_IP/health
 ```
 
 Do not use more than one Uvicorn worker. Each worker starts an additional log-generation thread and increases the disk-consumption rate.
+
+List of the storage issues when configure the reversed proxy server :
+
+```bash
+ubuntu@ip-172-31-20-0:/opt/storage-breaker/ape-aws-ec2-assessment-1$ sudo apt-get install nginx -y
+Reading package lists... Error!
+E: Write error - write (28: No space left on device)
+E: IO Error saving source cache
+E: The package lists or status file could not be parsed or opened.
+```
+Find the process 
+```bash
+ps aux | grep app.py
+```
+Kill it 
+```bash
+sudo kill -9 <PID>
+```
+Or kill it in one command:
+```bash
+sudo pkill -f app.py
+```
+Step 3 — Verify it's stopped
+```bash
+ps aux | grep app.py
+```
+Step 4 — Truncate the log
+```bash
+sudo truncate -s 0 /var/log/storage-breaker/application.log
+```
+
+Step 5 — check free space
+```bash
+df -h /dev/root
+```
+Install Ngnix
+```bash
+Sudo apt-get install nginx -y
+```
+ Create nginx reverse proxy config
+```bash
+buntu@ip-172-31-20-0:/opt/storage-breaker/ape-aws-ec2-assessment-1$ sudo tee /etc/nginx/sites-available/storage-breaker > /dev/null << 'EOF'
+server {
+    listen 80;
+    server_name 54.91.181.1;
+
+    location /health {
+        proxy_pass http://127.0.0.1:3000/health;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+EOF
+```
+Enable and restart:
+```bash
+sudo ln -s /etc/nginx/sites-available/storage-breaker /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t
+sudo systemctl restart nginx
+```
+Result 
+```bash
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+```
+Test with public :
+```bash
+curl http://54.91.181.1/health  #public_IP 
+```
+Result:
+```bash
+{"status":"healthy"}ubuntu@ip-172-31-20-0:/opt/storage-breaker/ape-aws-ec2-assessment-1$ 
+```
